@@ -77,9 +77,9 @@ def process_zip_file(zip_file, jd: str) -> List[Dict[str, str]]:
     return reviews
 
 def main():
-    logo_url = ".\kaasor.png"
-    favicon_url = ".\icon.png"
-    st.set_page_config(layout="wide", page_title="Resume Review", page_icon=".\icon.png")
+    logo_url = "kaasor.png"
+    favicon_url = "icon.png"
+    st.set_page_config(layout="wide", page_title="Resume Review", page_icon=favicon_url)
     
     # Display logo
     st.image(logo_url, width=200)
