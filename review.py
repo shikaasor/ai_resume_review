@@ -86,7 +86,6 @@ def main():
 
     
     st.markdown("<h1 style='text-align: center; color: #A5FFFD; border: 2px solid #30B0C2; border-radius: 10px; padding: 10px;'>RESUME REVIEW</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Built by Asor</p>", unsafe_allow_html=True)
     st.markdown("<h1 style='text-align: center; color: #F5FF84;'>The Perfect Hire</h1>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center;'>AI-powered resume review for candidate matching</h3>", unsafe_allow_html=True)
 
