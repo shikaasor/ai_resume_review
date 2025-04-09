@@ -43,7 +43,7 @@ def generate_review(text: str, jd: str) -> Optional[Dict[str, str]]:
         
         response = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama-3.1-70b-versatile",
+            model="llama-3.3-70b-versatile",
         )
         
         content = response.choices[0].message.content
