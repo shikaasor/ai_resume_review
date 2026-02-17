@@ -315,16 +315,37 @@ def call_llm(
 
 
 # ── Text extraction ───────────────────────────────────────────────────────────
-def extract_pdf_text(file_bytes: bytes) -> Optional[str]:
-    """Extract text from a PDF given its raw bytes."""
+def extract_pdf_text(file_bytes: bytes, chandra_api_key: str = "") -> Optional[str]:
+    """Extract text from a PDF given its raw bytes.
+
+    Falls back to Chandra OCR when the PDF is image-based (scanned)
+    and yields fewer than 100 characters of selectable text.
+    """
     try:
         reader = pdf.PdfReader(BytesIO(file_bytes))
-        return "".join(
+        text = "".join(
             page.extract_text() for page in reader.pages if page.extract_text()
         )
     except Exception as e:
         st.error(f"Error parsing PDF: {e}")
         return None
+
+    if len(text.strip()) >= 100:
+        return text
+
+    # Insufficient text — likely a scanned/image-based PDF
+    if chandra_api_key:
+        st.info("PDF appears to be image-based — running OCR via Chandra…")
+        return ocr_with_chandra(file_bytes, "resume.pdf", chandra_api_key)
+
+    if text.strip():
+        return text  # Return the little text we have rather than nothing
+
+    st.warning(
+        "This PDF contains no selectable text and no Chandra API key is set. "
+        "Provide a Chandra key in the sidebar to enable OCR for scanned PDFs."
+    )
+    return None
 
 
 def extract_docx_text(file_bytes: bytes) -> Optional[str]:
@@ -391,7 +412,7 @@ def extract_text_from_file(
     ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
 
     if ext == "pdf":
-        return extract_pdf_text(file_bytes)
+        return extract_pdf_text(file_bytes, chandra_api_key)
 
     elif ext == "docx":
         return extract_docx_text(file_bytes)
