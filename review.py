@@ -940,7 +940,8 @@ def main():
     # ── Header ────────────────────────────────────────────────────────────────
     _, col_hdr, _ = st.columns([1, 2, 1])
     with col_hdr:
-        st.image("kaasor.png", width=150)
+        _, img_col, _ = st.columns([1, 1, 1])
+        img_col.image("kaasor.png", use_container_width=True)
         st.markdown(
             "<h1 style='text-align:center; margin-bottom:0;'>RESUME REVIEW</h1>",
             unsafe_allow_html=True,
