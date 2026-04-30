@@ -15,7 +15,7 @@ load_dotenv()
 # ── Provider configuration ────────────────────────────────────────────────────
 PROVIDERS: Dict[str, dict] = {
     "Gemini": {
-        "models": ["gemini-2.5-flash", "gemini-3-flash-preview", "gemini-2.5-flash-lite"],
+        "models": ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-2.5-flash-lite"],
         "env_key": "GEMINI_API_KEY",
         "requires_key": True,
     },
@@ -30,7 +30,7 @@ PROVIDERS: Dict[str, dict] = {
         "requires_key": True,
     },
     "Ollama": {
-        "models": ["llama3.2", "llama3.1", "mistral", "phi3", "gemma2", "qwen2.5"],
+        "models": ["deepseek-v3.1:671b-cloud", "gpt-oss:120b-cloud", "minimax-m2.7:cloud", "lfm", "gemma"],
         "env_key": None,
         "requires_key": False,
     },
@@ -60,177 +60,18 @@ SUPPORTED_EXTENSIONS = {"pdf", "docx", "doc"} | set(IMAGE_MIME_TYPES)
 UPLOAD_TYPES = ["zip", "pdf", "docx", "doc", "png", "jpg", "jpeg", "tiff", "tif", "bmp", "webp"]
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
-SYSTEM_PROMPT = """
-You are a senior HR screening specialist conducting structured first-pass longlisting for an Applied AI Specialist Advisor position in the international development / donor-funded sector.
+_PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
-Your task:
-Evaluate the candidate’s resume strictly against the provided Job Description (JD) and produce structured, evidence-based scoring aligned to the organization’s longlist scorecard.
+def _load_prompt(filename: str) -> str:
+    path = os.path.join(_PROMPTS_DIR, filename)
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read().strip()
 
-You must prioritize REQUIRED qualifications in the JD over general resume strength.
-
-────────────────────────────────────────
-EVALUATION PRINCIPLES
-────────────────────────────────────────
-
-1. Evidence-Based Only
-- Use only information explicitly stated in the resume.
-- Do NOT infer unstated skills or experience.
-- Do NOT hallucinate contact details.
-- If information is missing, state “Not provided” and score accordingly.
-
-2. JD Priority Rule
-- Missing REQUIRED JD qualifications must significantly reduce relevant scores.
-- Preferred qualifications may increase scores but cannot compensate for missing required criteria.
-- Thematic and technical scoring must reflect alignment with the JD, not generic AI experience.
-
-3. Bias Control
-- Ignore name, gender, nationality, or demographic indicators.
-- Evaluate strictly on professional merit and documented experience.
-
-4. Consistency Rule
-- Ensure logical consistency across related scores.
-  - Technical Expertise ≥ AI Knowledge is acceptable.
-  - AI Knowledge = 5 cannot coexist with Technical Expertise ≤ 2 unless explicitly justified.
-  - AI Capacity should not exceed Technical Expertise unless evidence shows strategic-only role.
-- Avoid uniform scoring (e.g., all 4s). Differentiate meaningfully.
-
-5. Conciseness Rule
-- All text fields under 300 characters.
-- overall_assessment under 500 characters.
-
-────────────────────────────────────────
-SCORING SCALE (MANDATORY CALIBRATION)
-────────────────────────────────────────
-
-Rate all scored criteria from 1–5 using the following anchors:
-
-1 = No evidence or clearly unqualified  
-2 = Limited or tangential evidence; major gaps  
-3 = Meets minimum JD requirements; noticeable gaps  
-4 = Strong alignment with JD; minor gaps only  
-5 = Exceptional alignment; exceeds required criteria with clear impact  
-
-Avoid score inflation. A score of 5 should be rare and clearly justified by strong evidence.
-
-────────────────────────────────────────
-FIELD DEFINITIONS (STRICT DISTINCTIONS)
-────────────────────────────────────────
-
-1. Name Applicant  
-Full name as shown. "Not provided" if absent.
-
-2. Phone Number  
-Primary phone with country code if shown. "Not provided" if absent.
-
-3. Email Address  
-Primary email. "Not provided" if absent.
-
-4. Educational Qualifications  
-Highest relevant degrees with institution names. Note relevance to AI, data science, CS, digital transformation, or development policy.
-
-5. Professional Certification  
-Formal certifications only (AWS ML, Google Cloud AI, PMP, PRINCE2, Agile, sector credentials). "None listed" if absent.
-
-6. Relevant Work Experience  
-2–3 sentence summary of experience directly aligned to JD. Include years, advisory level, donor/digital/AI alignment.
-
-7. AI Knowledge (1–5)  
-Conceptual understanding of AI/ML frameworks, methods, and applications. Evidence: coursework, strategy papers, AI initiatives, technical discussions.  
-(Not hands-on depth — that is Technical Expertise.)
-
-8. Technical Expertise (1–5)  
-Hands-on implementation depth: ML/NLP development, analytics pipelines, system architecture, automation, deployment, production systems.
-
-9. AI Capacity (1–5)  
-Evidence of building AI capacity in organizations: training delivery, AI strategy development, readiness assessments, governance frameworks, adoption leadership.
-
-10. Specialized Donor Experience (1–5)  
-Direct work with multilateral/donor agencies (UN, World Bank, USAID, FCDO, EU, GIZ, AfDB, etc.). Consider depth, duration, and relevance.
-
-11. Thematic Relevance (1–5)  
-Alignment with JD thematic areas (e.g., governance, health, agriculture, climate, education, digital public infrastructure).
-
-12. Scale of Experience (1–5)  
-Complexity and scope: multi-country programs, national systems, large budgets, cross-functional teams, regional/global impact.
-
-13. Strategic & Advisory Skills (1–5)  
-Evidence of high-level advisory work: policy briefs, executive presentations, digital roadmaps, stakeholder engagement, C-suite influence.
-
-14. Communication & Reporting (1–5)  
-Demonstrated written/oral communication: published reports, proposal writing, donor documentation, multilingual ability, structured outputs.
-
-15. Application Completeness (1–5)  
-Resume structure, clarity, completeness (dates, roles, measurable impact, contact info). Penalize missing or vague sections.
-
-16. Overall Assessment  
-Begin with one of:
-- "Strongly Recommend"
-- "Recommend"
-- "Consider"
-- "Do Not Recommend"
-
-Then provide a concise justification referencing strongest and weakest dimensions.
-
-────────────────────────────────────────
-VERDICT LOGIC (DETERMINISTIC GUIDANCE)
-────────────────────────────────────────
-
-Strongly Recommend:
-- No critical JD-required gaps
-- No score below 3 in core areas (AI Knowledge, Technical Expertise, Donor Experience)
-- At least three scores of 4 or 5
-
-Recommend:
-- Meets most required criteria
-- Minor gaps only
-- Majority scores ≥3
-
-Consider:
-- Meets some core criteria but clear gaps in required areas
-- Multiple scores of 2
-
-Do Not Recommend:
-- Missing required JD qualifications
-- Multiple scores of 1 in core dimensions
-
-────────────────────────────────────────
-OUTPUT FORMAT (STRICT)
-────────────────────────────────────────
-
-Respond with ONLY a valid JSON object.  
-No markdown. No commentary. No explanation.
-
-{
-  "name_applicant": "",
-  "phone_number": "",
-  "email_address": "",
-  "educational_qualifications": "",
-  "professional_certification": "",
-  "relevant_work_experience": "",
-  "overall_assessment": "",
-  "ai_knowledge": 0,
-  "technical_expertise": 0,
-  "ai_capacity": 0,
-  "specialized_donor_experience": 0,
-  "thematic_relevance": 0,
-  "scale_of_experience": 0,
-  "strategic_advisory_skills": 0,
-  "communication_reporting": 0,
-  "application_completeness": 0
-}
-
-RULES:
-- All scored fields MUST be integers 1–5.
-- Do not output null.
-- If information is absent, score 1 and note gap in relevant text field.
-- Ensure score consistency and alignment with JD.
-""".strip()
-
-USER_PROMPT = """RESUME:
-{text}
-
-JOB DESCRIPTION:
-{jd}"""
+SYSTEM_PROMPT            = _load_prompt("system.txt")
+SYSTEM_PROMPT_STL        = _load_prompt("system_stl.txt")
+SYSTEM_PROMPT_GENERAL    = _load_prompt("system_general.txt")
+SYSTEM_PROMPT_CV_JD      = _load_prompt("system_cv_jd_analysis.txt")
+USER_PROMPT              = _load_prompt("user.txt")
 
 # Scored fields in display order
 SCORE_FIELDS = [
@@ -244,6 +85,107 @@ SCORE_FIELDS = [
     ("strategic_advisory_skills",   "Strategic & Advisory"),
     ("communication_reporting",     "Communication & Reporting"),
 ]
+
+SCORE_FIELDS_GENERAL = [
+    ("education_credentials",        "Education & Credentials"),
+    ("years_depth_of_experience",    "Years & Depth of Exp."),
+    ("technical_functional_skills",  "Technical / Functional"),
+    ("leadership_management",        "Leadership & Management"),
+    ("sector_industry_fit",          "Sector / Industry Fit"),
+    ("problem_solving_analytical",   "Problem Solving"),
+    ("communication_reporting",      "Communication & Reporting"),
+    ("application_completeness",     "Application Completeness"),
+]
+
+SCORE_FIELDS_CV_JD = [
+    ("jd_qualification_match", "Qualification Match"),
+    ("jd_experience_match",    "Experience Match"),
+    ("jd_overall_fit",         "Overall JD Fit"),
+]
+
+SCORE_FIELDS_STL = [
+    ("ngo_industry_experience",            "NGO Experience"),
+    ("leadership_roles",                   "Leadership Roles"),
+    ("technical_thematic_relevance",       "Technical / Thematic"),
+    ("programme_project_management",       "Programme Mgmt"),
+    ("stakeholder_partnership_engagement", "Stakeholder Engagement"),
+    ("communication_reporting",            "Communication & Reporting"),
+    ("application_completeness",           "Application Completeness"),
+]
+
+# ── Scorecard registry ────────────────────────────────────────────────────────
+SCORECARDS = {
+    "AI Advisor": {
+        "system_prompt": SYSTEM_PROMPT,
+        "score_fields": SCORE_FIELDS,
+        "requires_jd": True,
+        "required_keys": {
+            "name_applicant", "phone_number", "email_address",
+            "educational_qualifications", "professional_certification",
+            "relevant_work_experience", "overall_assessment",
+            "ai_knowledge", "application_completeness", "specialized_donor_experience",
+            "thematic_relevance", "technical_expertise", "ai_capacity",
+            "scale_of_experience", "strategic_advisory_skills", "communication_reporting",
+        },
+        "info_fields": [
+            ("Education",      "educational_qualifications"),
+            ("Certifications", "professional_certification"),
+            ("Experience",     "relevant_work_experience"),
+        ],
+    },
+    "General": {
+        "system_prompt": SYSTEM_PROMPT_GENERAL,
+        "score_fields": SCORE_FIELDS_GENERAL,
+        "requires_jd": False,
+        "required_keys": {
+            "name_applicant", "phone_number", "email_address",
+            "educational_qualifications", "professional_certification",
+            "relevant_work_experience", "overall_assessment",
+            "education_credentials", "years_depth_of_experience",
+            "technical_functional_skills", "leadership_management",
+            "sector_industry_fit", "problem_solving_analytical",
+            "communication_reporting", "application_completeness",
+        },
+        "info_fields": [
+            ("Education",      "educational_qualifications"),
+            ("Certifications", "professional_certification"),
+            ("Experience",     "relevant_work_experience"),
+        ],
+    },
+    "CV vs JD Analysis (GGHN)": {
+        "system_prompt": SYSTEM_PROMPT_CV_JD,
+        "score_fields": SCORE_FIELDS_CV_JD,
+        "requires_jd": True,
+        "required_keys": {
+            "name_applicant", "phone_number", "email_address",
+            "year_of_qualification", "years_of_experience",
+            "gghn_tenure", "gghn_responsibilities", "overall_assessment",
+            "jd_qualification_match", "jd_experience_match", "jd_overall_fit",
+        },
+        "info_fields": [
+            ("Qualification Year",    "year_of_qualification"),
+            ("Years of Experience",   "years_of_experience"),
+            ("GGHN Tenure",           "gghn_tenure"),
+            ("GGHN Responsibilities", "gghn_responsibilities"),
+        ],
+    },
+    "STL Consultant": {
+        "system_prompt": SYSTEM_PROMPT_STL,
+        "score_fields": SCORE_FIELDS_STL,
+        "requires_jd": False,
+        "required_keys": {
+            "name_applicant", "phone_number", "email_address",
+            "graduation_year", "academic_qualifications_summary", "overall_assessment",
+            "ngo_industry_experience", "leadership_roles", "technical_thematic_relevance",
+            "programme_project_management", "stakeholder_partnership_engagement",
+            "communication_reporting", "application_completeness",
+        },
+        "info_fields": [
+            ("Graduation Year",         "graduation_year"),
+            ("Academic Qualifications", "academic_qualifications_summary"),
+        ],
+    },
+}
 
 
 # ── LLM dispatch ──────────────────────────────────────────────────────────────
@@ -442,17 +384,7 @@ def extract_text_from_file(
 
 
 # ── Response parsing & review generation ─────────────────────────────────────
-REQUIRED_KEYS = {
-    "name_applicant", "phone_number", "email_address",
-    "educational_qualifications", "professional_certification",
-    "relevant_work_experience", "overall_assessment",
-    "ai_knowledge", "application_completeness", "specialized_donor_experience",
-    "thematic_relevance", "technical_expertise", "ai_capacity",
-    "scale_of_experience", "strategic_advisory_skills", "communication_reporting",
-}
-
-
-def parse_response(content: str) -> Optional[Dict]:
+def parse_response(content: str, scorecard: dict) -> Optional[Dict]:
     """Extract and validate the JSON scorecard from the LLM response."""
     cleaned = re.sub(r"```(?:json)?", "", content).strip().strip("`").strip()
     match = re.search(r"\{.*\}", cleaned, re.DOTALL)
@@ -462,9 +394,9 @@ def parse_response(content: str) -> Optional[Dict]:
         data = json.loads(match.group())
     except json.JSONDecodeError:
         return None
-    if not REQUIRED_KEYS.issubset(data.keys()):
+    if not scorecard["required_keys"].issubset(data.keys()):
         return None
-    for key, _ in SCORE_FIELDS:
+    for key, _ in scorecard["score_fields"]:
         try:
             data[key] = max(1, min(5, int(data[key])))
         except (ValueError, TypeError):
@@ -479,20 +411,23 @@ def generate_review(
     model: str,
     api_key: str,
     ollama_host: str,
+    scorecard: dict,
 ) -> Optional[Dict]:
     try:
-        user_prompt = USER_PROMPT.format(text=text, jd=jd)
+        if jd.strip():
+            user_prompt = USER_PROMPT.format(text=text, jd=jd)
+        else:
+            user_prompt = f"RESUME:\n{text}"
         content = call_llm(
             user_prompt, provider, model, api_key, ollama_host,
-            system_prompt=SYSTEM_PROMPT,
+            system_prompt=scorecard["system_prompt"],
         )
-        result = parse_response(content)
+        result = parse_response(content, scorecard)
         if result is None:
             st.error("Could not parse the model response. Raw output:")
             st.code(content)
         else:
-            # Store the computed percentage so it lands in every CSV export
-            result["percentage_suitability"] = overall_score(result)
+            result["percentage_suitability"] = overall_score(result, scorecard["score_fields"])
         return result
     except Exception as e:
         st.error(f"Error from {provider}: {e}")
@@ -506,6 +441,7 @@ def process_zip_file(
     model: str,
     api_key: str,
     ollama_host: str,
+    scorecard: dict,
     chandra_api_key: str = "",
     progress_bar=None,
 ) -> List[Dict]:
@@ -531,14 +467,13 @@ def process_zip_file(
 
             ext = entry.lower().rsplit(".", 1)[-1]
             if ext in IMAGE_MIME_TYPES:
-                # Images need OCR — show a spinner since it's async
                 with st.spinner(f"OCR via Chandra: `{entry}`…"):
                     text = extract_text_from_file(file_bytes, entry, chandra_api_key)
             else:
                 text = extract_text_from_file(file_bytes, entry, chandra_api_key)
 
             if text:
-                review = generate_review(text, jd, provider, model, api_key, ollama_host)
+                review = generate_review(text, jd, provider, model, api_key, ollama_host, scorecard)
                 if review:
                     review["File"] = entry
                     reviews.append(review)
@@ -549,10 +484,10 @@ def process_zip_file(
 
 
 # ── Score helpers ─────────────────────────────────────────────────────────────
-def overall_score(review: Dict) -> float:
-    """Compute an overall percentage from the nine 1-5 scored fields."""
-    total = sum(review.get(k, 1) for k, _ in SCORE_FIELDS)
-    return round(total / (len(SCORE_FIELDS) * 5) * 100, 1)
+def overall_score(review: Dict, score_fields: list) -> float:
+    """Compute an overall percentage from the scored fields."""
+    total = sum(review.get(k, 1) for k, _ in score_fields)
+    return round(total / (len(score_fields) * 5) * 100, 1)
 
 
 def score_css_class(pct: float) -> str:
@@ -669,20 +604,29 @@ def inject_custom_css():
 
 
 # ── Result renderers ──────────────────────────────────────────────────────────
-def render_candidate_card(review: Dict):
-    pct = overall_score(review)
+def render_candidate_card(review: Dict, scorecard: dict):
+    score_fields = scorecard["score_fields"]
+    pct = overall_score(review, score_fields)
     css_cls = score_css_class(pct)
     name = review.get("name_applicant", "Unknown")
     phone = review.get("phone_number", "Not provided")
     email = review.get("email_address", "Not provided")
-    edu = review.get("educational_qualifications", "")
-    cert = review.get("professional_certification", "")
-    exp = review.get("relevant_work_experience", "")
     assessment = review.get("overall_assessment", "")
     fname = review.get("File", "")
 
+    # Info lines (education/cert/exp or graduation year/qualifications etc.)
+    info_html = ""
+    for label, key in scorecard["info_fields"]:
+        val = review.get(key, "")
+        if val:
+            info_html += (
+                f"<p style='margin:4px 0;font-size:0.85em;'>"
+                f"<strong style='color:#00E5FF;'>{label}:</strong> "
+                f"<span style='color:#CFD8DC;'>{val}</span></p>"
+            )
+
     score_rows = ""
-    items = list(SCORE_FIELDS)
+    items = list(score_fields)
     for i in range(0, len(items), 2):
         row_html = "<div style='display:flex;gap:12px;margin-bottom:8px;'>"
         for key, label in items[i:i + 2]:
@@ -712,9 +656,7 @@ def render_candidate_card(review: Dict):
                 <span style="color:#90A4AE;font-size:0.82em;">📞 {phone}</span>
                 <span style="color:#90A4AE;font-size:0.82em;">✉️ {email}</span>
             </div>
-            <p style="margin:4px 0;font-size:0.85em;"><strong style="color:#00E5FF;">Education:</strong> <span style="color:#CFD8DC;">{edu}</span></p>
-            <p style="margin:4px 0 10px;font-size:0.85em;"><strong style="color:#00E5FF;">Certifications:</strong> <span style="color:#CFD8DC;">{cert}</span></p>
-            <p style="margin:0 0 8px;color:#CFD8DC;font-size:0.88em;">{exp}</p>
+            {info_html}
             {'<p style="margin:0 0 12px;padding:8px 12px;background:rgba(0,229,255,0.07);border-left:3px solid #00E5FF;border-radius:4px;color:#FAFAFA;font-size:0.88em;"><strong>Assessment:</strong> ' + assessment + '</p>' if assessment else ''}
             <div style="margin-top:4px;">{score_rows}</div>
         </div>
@@ -724,20 +666,6 @@ def render_candidate_card(review: Dict):
 
 
 EXCEL_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-# Column spec: (display header, review dict key, col width, wrap_text)
-_EXCEL_COLUMNS = [
-    ("Name",                    "name_applicant",          28,  True),
-    ("Overall %",               "percentage_suitability",  12,  False),
-    ("Overall Assessment",      "overall_assessment",      58,  True),
-    ("Email",                   "email_address",           30,  False),
-    ("Phone",                   "phone_number",            18,  False),
-] + [(label, key, 20, False) for key, label in SCORE_FIELDS] + [
-    ("Education",               "educational_qualifications", 42, True),
-    ("Certifications",          "professional_certification", 36, True),
-    ("Experience Summary",      "relevant_work_experience",   58, True),
-    ("File",                    "File",                       30, False),
-]
 
 _SCORE_FILLS = {
     1: ("FF5252", "FFFFFF"),   # red   / white text
@@ -754,13 +682,28 @@ _ASSESS_FILLS = {
     "do not recommend":   ("FFCDD2", "B71C1C"),
 }
 
-_SCORE_KEYS = {k for k, _ in SCORE_FIELDS}
-
-
-def generate_excel(reviews: List[Dict]) -> bytes:
+def generate_excel(reviews: List[Dict], scorecard: dict) -> bytes:
     """Build a colour-coded, formatted Excel workbook from the review list."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    score_fields = scorecard["score_fields"]
+    info_fields  = scorecard["info_fields"]
+    score_keys   = {k for k, _ in score_fields}
+
+    # Build column spec dynamically: (header, key, width, wrap)
+    excel_columns = (
+        [
+            ("Name",             "name_applicant",         28, True),
+            ("Overall %",        "percentage_suitability", 12, False),
+            ("Overall Assessment","overall_assessment",    58, True),
+            ("Email",            "email_address",          30, False),
+            ("Phone",            "phone_number",           18, False),
+        ]
+        + [(label, key, 20, False) for key, label in score_fields]
+        + [(label, key, 42, True) for label, key in info_fields]
+        + [("File", "File", 30, False)]
+    )
 
     wb = Workbook()
     ws = wb.active
@@ -782,7 +725,7 @@ def generate_excel(reviews: List[Dict]) -> bytes:
     ws.row_dimensions[1].height = 42
     header_fill = _fill("1A237E")
 
-    for col_idx, (header, _key, width, wrap) in enumerate(_EXCEL_COLUMNS, 1):
+    for col_idx, (header, _key, width, wrap) in enumerate(excel_columns, 1):
         from openpyxl.utils import get_column_letter
         cell = ws.cell(row=1, column=col_idx, value=header)
         cell.fill = header_fill
@@ -797,7 +740,7 @@ def generate_excel(reviews: List[Dict]) -> bytes:
         row_bg = "F8F9FA" if row_idx % 2 == 0 else "FFFFFF"
         ws.row_dimensions[row_idx].height = 80
 
-        for col_idx, (header, key, _width, wrap) in enumerate(_EXCEL_COLUMNS, 1):
+        for col_idx, (header, key, _width, wrap) in enumerate(excel_columns, 1):
             value = review.get(key, "")
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.border = cell_border
@@ -808,7 +751,7 @@ def generate_excel(reviews: List[Dict]) -> bytes:
             cell.alignment = _align(wrap=wrap, h="left" if wrap else "center")
 
             # Score cells (1–5)
-            if key in _SCORE_KEYS and isinstance(value, int):
+            if key in score_keys and isinstance(value, int):
                 score = max(1, min(5, value))
                 bg, fg = _SCORE_FILLS[score]
                 cell.fill = _fill(bg)
@@ -853,8 +796,11 @@ def generate_excel(reviews: List[Dict]) -> bytes:
     return buf.read()
 
 
-def render_results_table(reviews: List[Dict], source_name: str):
-    scores = [overall_score(r) for r in reviews]
+def render_results_table(reviews: List[Dict], source_name: str, scorecard: dict):
+    score_fields = scorecard["score_fields"]
+    info_fields  = scorecard["info_fields"]
+
+    scores = [overall_score(r, score_fields) for r in reviews]
     c1, c2, c3 = st.columns(3)
     c1.metric("Candidates", len(reviews))
     c2.metric("Avg. Score", f"{sum(scores) / len(scores):.1f}%" if scores else "N/A")
@@ -864,22 +810,21 @@ def render_results_table(reviews: List[Dict], source_name: str):
     for r in reviews:
         row = {
             "Name": r.get("name_applicant", ""),
-            "Overall %": r.get("percentage_suitability", overall_score(r)),
+            "Overall %": r.get("percentage_suitability", overall_score(r, score_fields)),
             "Assessment": r.get("overall_assessment", ""),
             "Email": r.get("email_address", ""),
             "Phone": r.get("phone_number", ""),
         }
-        for key, label in SCORE_FIELDS:
+        for key, label in score_fields:
             row[label] = r.get(key, 1)
-        row["Education"] = r.get("educational_qualifications", "")
-        row["Certifications"] = r.get("professional_certification", "")
-        row["Experience Summary"] = r.get("relevant_work_experience", "")
+        for label, key in info_fields:
+            row[label] = r.get(key, "")
         row["File"] = r.get("File", "")
         rows.append(row)
 
     st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
-    xlsx = generate_excel(reviews)
+    xlsx = generate_excel(reviews, scorecard)
     st.download_button(
         "⬇ Download Scorecard (Excel)",
         xlsx,
@@ -934,6 +879,15 @@ def main():
                 st.warning(f"API key required: `{cfg['env_key']}`")
 
         st.divider()
+        st.markdown("## 📋 Scorecard")
+        scorecard_name = st.selectbox(
+            "Evaluation template",
+            list(SCORECARDS.keys()),
+            help="Select the scoring rubric to apply to all uploaded resumes.",
+        )
+        active_scorecard = SCORECARDS[scorecard_name]
+
+        st.divider()
         st.markdown("## 🔍 OCR (Images)")
         chandra_api_key = st.text_input(
             "CHANDRA_API_KEY",
@@ -985,12 +939,17 @@ def main():
 
     with col_left:
         st.markdown('<div class="glass-container">', unsafe_allow_html=True)
-        st.subheader("Job Description")
+        jd_optional = not active_scorecard["requires_jd"]
+        st.subheader("Job Description" + (" *(optional)*" if jd_optional else ""))
         jd = st.text_area(
             "Paste the Job Description",
             height=300,
             label_visibility="collapsed",
-            placeholder="Paste the full job description here…",
+            placeholder=(
+                "Paste the job description here, or leave blank to rank candidates on general STL criteria…"
+                if jd_optional
+                else "Paste the full job description here…"
+            ),
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1021,8 +980,8 @@ def main():
 
     # Validation
     errors = []
-    if not jd.strip():
-        errors.append("Job Description is empty.")
+    if active_scorecard["requires_jd"] and not jd.strip():
+        errors.append("Job Description is required for this scorecard.")
     if not uploaded_files:
         errors.append("No resume files uploaded.")
     if cfg["requires_key"] and not api_key:
@@ -1050,15 +1009,17 @@ def main():
             progress_bar = st.progress(0, text="Starting…")
             reviews = process_zip_file(
                 file, jd, provider, model, api_key, ollama_host,
+                scorecard=active_scorecard,
                 chandra_api_key=chandra_api_key,
                 progress_bar=progress_bar,
             )
             progress_bar.empty()
 
             if reviews:
-                reviews.sort(key=overall_score, reverse=True)
+                sf = active_scorecard["score_fields"]
+                reviews.sort(key=lambda r: overall_score(r, sf), reverse=True)
                 all_reviews.extend(reviews)
-                render_results_table(reviews, file.name)
+                render_results_table(reviews, file.name, active_scorecard)
             else:
                 st.warning(f"No supported resume files found in `{file.name}`.")
 
@@ -1075,15 +1036,15 @@ def main():
                 file_bytes = file.read()
                 text = extract_text_from_file(file_bytes, file.name, chandra_api_key)
                 if text:
-                    review = generate_review(text, jd, provider, model, api_key, ollama_host)
+                    review = generate_review(text, jd, provider, model, api_key, ollama_host, active_scorecard)
                     if review:
                         review["File"] = file.name
                         all_reviews.append(review)
-                        render_candidate_card(review)
+                        render_candidate_card(review, active_scorecard)
 
     if len(all_reviews) > 1:
         st.markdown("---")
-        xlsx_all = generate_excel(all_reviews)
+        xlsx_all = generate_excel(all_reviews, active_scorecard)
         st.download_button(
             "⬇ Download Full Scorecard (Excel)",
             xlsx_all,

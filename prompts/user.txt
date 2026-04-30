@@ -1,0 +1,5 @@
+RESUME:
+{text}
+
+JOB DESCRIPTION:
+{jd}
